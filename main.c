@@ -3,6 +3,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <pwd.h>
+#include <grp.h>
 
 #define MODE_STRING_COUNT 11
 
@@ -58,12 +60,35 @@ char* get_attrs_string(mode_t mode)
 }
 
 
+char* get_user_by_uid(uid_t uid)
+{
+    struct passwd *pd;
+
+    pd = getpwuid(uid);
+    return pd->pw_name;
+}
+
+
+char* get_group_by_gid(gid_t gid)
+{
+    struct group *gr;
+    gr = getgrgid(gid);
+
+    return gr->gr_name;
+}
+
+
 void print_file_info(const struct stat* file_info, const char* file_name)
 {
     char* mode;
+    char* user;
+    char* group;
 
     mode = get_attrs_string(file_info->st_mode);
-    printf("%s %lu %s \n", mode, file_info->st_nlink, file_name);
+    user = get_user_by_uid(file_info->st_uid);
+    group = get_group_by_gid(file_info->st_gid);
+    printf("%s %lu %s %s %ld %s \n", mode, file_info->st_nlink, user, group, file_info->st_size, file_name);
+
     free(mode);
 }
 
@@ -96,6 +121,7 @@ int main(int argc, char** argv) {
                 perror("");
                 continue;
             }
+            closedir(dir);
         }
 
     }
