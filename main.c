@@ -12,49 +12,58 @@
 char* get_attrs_string(mode_t mode)
 {
     char *string = calloc(MODE_STRING_COUNT, sizeof(char ));
-    char file_mode = '-';
-    char access_rights[10] = "---------";
 
-    if (string == NULL)
+    if (string == NULL) {
         return NULL;
+    }
+
+    memset(string, '-', (MODE_STRING_COUNT - 1) * sizeof(char ));
 
     switch (mode & S_IFMT) {
         case S_IFSOCK:
-            file_mode = 's';
+            string[0] = 's';
             break;
         case S_IFDIR:
-            file_mode = 'd';
+            string[0] = 'd';
             break;
         case S_IFBLK:
-            file_mode = 'b';
+            string[0] = 'b';
             break;
         case S_IFCHR:
-            file_mode = 'c';
+            string[0] = 'c';
             break;
         case S_IFREG:
-            file_mode = '-';
+            string[0] = '-';
             break;
         case S_IFLNK:
-            file_mode = 'l';
+            string[0] = 'l';
             break;
         case S_IFIFO:
-            file_mode = 'p';
+            string[0] = 'p';
             break;
     }
 
     for (unsigned int rights = mode & (S_IRWXU | S_IRWXG | S_IRWXO), i = 0; i < 3; i++) {
-        if ((rights & 0400 >> i * 3) != 0)
-            access_rights[0 + i * 3] = 'r';
+        if ((rights & 0400 >> i * 3) != 0){
+            string[1 + i * 3] = 'r';
+        }
 
-        if ((rights & 0200 >> i * 3) != 0)
-            access_rights[1 + i * 3] = 'w';
+        if ((rights & 0200 >> i * 3) != 0){
+            string[2 + i * 3] = 'w';
+        }
 
-        if ((rights & 0100 >> i * 3) != 0)
-            access_rights[2 + i * 3] = 'x';
+        if ((rights & 0100 >> i * 3) != 0){
+            string[3 + i * 3] = 'x';
+        }
     }
 
-    string[0] = file_mode;
-    strcat(string, access_rights);
+    if ((mode & S_ISUID) != 0){
+        string[3] = 's';
+    }
+
+    if ((mode & S_ISGID) != 0){
+        string[6] = 's';
+    }
 
     return string;
 
@@ -64,8 +73,11 @@ char* get_attrs_string(mode_t mode)
 char* get_user_by_uid(uid_t uid)
 {
     struct passwd *pd;
-
     pd = getpwuid(uid);
+    if (pd == NULL){
+        return NULL;
+    }
+
     return pd->pw_name;
 }
 
@@ -74,7 +86,9 @@ char* get_group_by_gid(gid_t gid)
 {
     struct group *gr;
     gr = getgrgid(gid);
-
+    if (gr == NULL){
+        return NULL;
+    }
     return gr->gr_name;
 }
 
