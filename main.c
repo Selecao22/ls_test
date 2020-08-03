@@ -5,6 +5,7 @@
 #include <string.h>
 #include <pwd.h>
 #include <grp.h>
+#include <unistd.h>
 
 #define MODE_STRING_COUNT 11
 
@@ -92,39 +93,76 @@ void print_file_info(const struct stat* file_info, const char* file_name)
     free(mode);
 }
 
+void print_directory_info(const char* dir_path)
+{
+    DIR* dir;
+    struct dirent* ent;
+    struct stat file_info;
+    int status;
+
+    dir = opendir(dir_path);
+    if (dir == NULL) {
+        perror("");
+        return;
+    }
+    while ((ent = readdir(dir)) != NULL){
+        status = stat(ent->d_name, &file_info);
+        if (status != 0){
+            continue;
+        }
+        print_file_info(&file_info, ent->d_name);
+    }
+    closedir(dir);
+}
+
+
+void parse_arguments(int argc, char** argv, char*** parsed_args, int* args_count)
+{
+    char** args_buffer;
+    char* buffer;
+
+    *args_count = argc == 1 ? 1 : argc - 1;
+    args_buffer = calloc(*args_count, sizeof(char*));
+    if (argc == 1){
+        buffer = calloc(100, sizeof(char));
+        args_buffer[0] = getcwd(buffer, 100);
+    } else {
+        for (int i = 0; i < *args_count; ++i) {
+            args_buffer[i] = argv[i + 1];
+        }
+    }
+
+    *parsed_args = args_buffer;
+}
+
 
 int main(int argc, char** argv) {
     char** files;
+    struct stat file_info;
     int status;
+    int args_count;
 
-    if (argc == 1) {
-        printf("usage: %s PATH1...PATHn\n", argv[0]);
-        return 0;
-    }
-    else {
-        files = argv + 1;
-    }
+    parse_arguments(argc, argv, &files, &args_count);
 
-    for (int i = 0; i < argc - 1; ++i) {
-        struct stat file_info;
+    for (int i = 0; i < args_count; ++i) {
         status = stat(files[i], &file_info);
         if (status != 0){
             perror("");
             continue;
         }
 
-        print_file_info(&file_info, files[i]);
-
-        if (S_ISDIR(file_info.st_mode)){
-            DIR *dir = opendir(files[i]);
-            if (dir == NULL) {
-                perror("");
-                continue;
-            }
-            closedir(dir);
+        if ((S_ISDIR(file_info.st_mode)) != 0){
+            print_directory_info(files[i]);
         }
-
+        else {
+            print_file_info(&file_info, files[i]);
+        }
     }
+
+    if (argc == 1) {
+        free(files[0]);
+    }
+    free(files);
 
     return 0;
 }
