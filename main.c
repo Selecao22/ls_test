@@ -67,6 +67,10 @@ char* get_attrs_string(mode_t mode)
         string[6] = 's';
     }
 
+    if ((mode & S_ISVTX) != 0){
+        string[9] = 't';
+    }
+
     return string;
 
 }
