@@ -116,20 +116,33 @@ void get_mod_time_string(struct timespec ts, char* buf, int buf_count)
 }
 
 
-void print_file_info(const struct stat* file_info, const char* file_name)
+void print_file_info(const struct stat* file_info, const char* file_name, const char* path)
 {
     char* mode;
     char* user;
     char* group;
     char* mod_time;
-
+    char link_path[100] = {0};
+    char file_path[200] = {0};
     mod_time = calloc(MOD_TIME_STRING_SIZE, sizeof(char ));
 
     mode = get_attrs_string(file_info->st_mode);
     user = get_user_by_uid(file_info->st_uid);
     group = get_group_by_gid(file_info->st_gid);
     get_mod_time_string(file_info->st_mtim, mod_time, MOD_TIME_STRING_SIZE);
-    printf("%s %lu %s %s %ld %s %s \n", mode, file_info->st_nlink, user, group, file_info->st_size, mod_time, file_name);
+    if (S_ISLNK(file_info->st_mode) && path != NULL){
+        if(readlink(path, link_path, 100) != -1){
+            sprintf(file_path, "%s -> %s", file_name, link_path);
+        }
+    }
+    printf("%s %lu %s %s %ld %s %s \n",
+           mode,
+           file_info->st_nlink,
+           user,
+           group,
+           file_info->st_size,
+           mod_time,
+           S_ISLNK(file_info->st_mode) ? file_path : file_name);
 
     free(mode);
     free(mod_time);
@@ -165,7 +178,7 @@ void print_directory_info(const char* dir_path)
     while ((ent = readdir(dir)) != NULL){
         full_path = calloc(strlen(dir_path) + strlen(ent->d_name) + 1, sizeof(char));
         sprintf(full_path, "%s/%s", dir_path, ent->d_name);
-        status = stat(full_path, &file_info);
+        status = lstat(full_path, &file_info);
         if (status != 0){
             perror("");
             continue;
@@ -173,7 +186,7 @@ void print_directory_info(const char* dir_path)
         if (is_file_hidden(ent->d_name)){
             continue;
         }
-        print_file_info(&file_info, ent->d_name);
+        print_file_info(&file_info, ent->d_name, full_path);
     }
     closedir(dir);
 }
@@ -208,7 +221,7 @@ int main(int argc, char** argv) {
     parse_arguments(argc, argv, &files, &args_count);
 
     for (int i = 0; i < args_count; ++i) {
-        status = stat(files[i], &file_info);
+        status = lstat(files[i], &file_info);
         if (status != 0){
             perror("");
             continue;
@@ -218,7 +231,7 @@ int main(int argc, char** argv) {
             print_directory_info(files[i]);
         }
         else {
-            print_file_info(&file_info, files[i]);
+            print_file_info(&file_info, files[i], NULL);
         }
     }
 
