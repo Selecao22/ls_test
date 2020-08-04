@@ -94,13 +94,25 @@ char* get_group_by_gid(gid_t gid)
     return gr->gr_name;
 }
 
+
 void get_mod_time_string(struct timespec ts, char* buf, int buf_count)
 {
+
+    char current_year[5];
+    struct timespec real_time;
+
     if (buf == NULL || buf_count == 0){
         return;
     }
 
-    strftime(buf, buf_count, "%b %d %H:%M ", gmtime(&ts.tv_sec));
+    clock_gettime(CLOCK_REALTIME, &real_time);
+    strftime(current_year, 5, "%Y", gmtime(&real_time.tv_sec));
+    strftime(buf, buf_count, "%Y", gmtime(&ts.tv_sec));
+    if (!strcmp(current_year, buf)) {
+        strftime(buf, buf_count, "%b %d %H:%M", gmtime(&ts.tv_sec));
+    } else {
+        strftime(buf, buf_count, "%b %d %Y", gmtime(&ts.tv_sec));
+    }
 }
 
 
