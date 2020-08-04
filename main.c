@@ -135,11 +135,26 @@ void print_file_info(const struct stat* file_info, const char* file_name)
     free(mod_time);
 }
 
+
+int is_file_hidden(char* file_name)
+{
+    char* symbol_entry;
+
+    symbol_entry = strchr(file_name, '.');
+    if (symbol_entry == NULL || symbol_entry != file_name){
+        return 0;
+    }
+
+    return 1;
+}
+
+
 void print_directory_info(const char* dir_path)
 {
     DIR* dir;
     struct dirent* ent;
     struct stat file_info;
+    char* full_path;
     int status;
 
     dir = opendir(dir_path);
@@ -148,8 +163,14 @@ void print_directory_info(const char* dir_path)
         return;
     }
     while ((ent = readdir(dir)) != NULL){
-        status = stat(ent->d_name, &file_info);
+        full_path = calloc(strlen(dir_path) + strlen(ent->d_name) + 1, sizeof(char));
+        sprintf(full_path, "%s/%s", dir_path, ent->d_name);
+        status = stat(full_path, &file_info);
         if (status != 0){
+            perror("");
+            continue;
+        }
+        if (is_file_hidden(ent->d_name)){
             continue;
         }
         print_file_info(&file_info, ent->d_name);
