@@ -6,18 +6,20 @@
 #include <pwd.h>
 #include <grp.h>
 #include <unistd.h>
+#include <time.h>
 
-#define MODE_STRING_COUNT 11
+#define MODE_STRING_SIZE 11
+#define MOD_TIME_STRING_SIZE 30
 
 char* get_attrs_string(mode_t mode)
 {
-    char *string = calloc(MODE_STRING_COUNT, sizeof(char ));
+    char *string = calloc(MODE_STRING_SIZE, sizeof(char ));
 
     if (string == NULL) {
         return NULL;
     }
 
-    memset(string, '-', (MODE_STRING_COUNT - 1) * sizeof(char ));
+    memset(string, '-', (MODE_STRING_SIZE - 1) * sizeof(char ));
 
     switch (mode & S_IFMT) {
         case S_IFSOCK:
@@ -92,19 +94,33 @@ char* get_group_by_gid(gid_t gid)
     return gr->gr_name;
 }
 
+void get_mod_time_string(struct timespec ts, char* buf, int buf_count)
+{
+    if (buf == NULL || buf_count == 0){
+        return;
+    }
+
+    strftime(buf, buf_count, "%b %d %H:%M ", gmtime(&ts.tv_sec));
+}
+
 
 void print_file_info(const struct stat* file_info, const char* file_name)
 {
     char* mode;
     char* user;
     char* group;
+    char* mod_time;
+
+    mod_time = calloc(MOD_TIME_STRING_SIZE, sizeof(char ));
 
     mode = get_attrs_string(file_info->st_mode);
     user = get_user_by_uid(file_info->st_uid);
     group = get_group_by_gid(file_info->st_gid);
-    printf("%s %lu %s %s %ld %s \n", mode, file_info->st_nlink, user, group, file_info->st_size, file_name);
+    get_mod_time_string(file_info->st_mtim, mod_time, MOD_TIME_STRING_SIZE);
+    printf("%s %lu %s %s %ld %s %s \n", mode, file_info->st_nlink, user, group, file_info->st_size, mod_time, file_name);
 
     free(mode);
+    free(mod_time);
 }
 
 void print_directory_info(const char* dir_path)
