@@ -11,6 +11,13 @@
 #define MODE_STRING_SIZE 11
 #define MOD_TIME_STRING_SIZE 30
 
+static const char CURRENT_DIRECTORY[] = ".";
+
+struct file_data {
+    char *name;
+    struct stat info;
+};
+
 char* get_attrs_string(mode_t mode)
 {
     char *string = calloc(MODE_STRING_SIZE, sizeof(char ));
@@ -120,37 +127,26 @@ void get_mod_time_string(struct timespec ts, char* buf, int buf_count)
 }
 
 
-void print_file_info(const struct stat* file_info, const char* file_name, const char* path)
+void print_file_info(struct stat* file_info, char* file_name)
 {
     char* mode;
     char* user;
     char* group;
     char* mod_time;
-    char link_path[100] = {0};
-    char file_path[200] = {0};
     mod_time = calloc(MOD_TIME_STRING_SIZE, sizeof(char ));
 
     mode = get_attrs_string(file_info->st_mode);
     user = get_user_by_uid(file_info->st_uid);
     group = get_group_by_gid(file_info->st_gid);
     get_mod_time_string(file_info->st_mtim, mod_time, MOD_TIME_STRING_SIZE);
-    if (S_ISLNK(file_info->st_mode)){
-        if(readlink(path == NULL ? file_name : path, link_path, 100) != -1){
-            sprintf(file_path, "%s -> %s", file_name, link_path);
-        } else{
-            perror("");
-        }
-    } else {
-        sprintf(file_path, "%s", file_name);
-    }
-    printf("%s %lu %s %s %ld %s %s \n",
+    printf("%s %lu %s %s %ld %s %s",
            mode,
            file_info->st_nlink,
            user,
            group,
            file_info->st_size,
            mod_time,
-           file_path);
+           file_name);
 
     free(mode);
     free(mod_time);
@@ -170,74 +166,151 @@ int is_file_hidden(char* file_name)
 }
 
 
-void print_directory_info(const char* dir_path)
+char* get_symlink_path(char* link_path)
+{
+    char* symlink_path;
+
+    symlink_path = calloc(100, sizeof(char));
+    if (symlink_path == NULL){
+        return NULL;
+    }
+
+    if(readlink(link_path, symlink_path, 100) != -1) {
+        return symlink_path;
+    }
+
+    return NULL;
+}
+
+
+char* get_file_name(char* full_path){
+    char* ptr;
+    char* slash_ptr = full_path;
+
+    ptr = full_path;
+
+    for (int i = 0; ptr[i] != 0; ++i) {
+        if (ptr[i] == '/' && ptr[i + 1] != 0){
+            slash_ptr = ptr + i + 1;
+        }
+    }
+
+    return slash_ptr;
+}
+
+
+int sort_files(const void* file1, const void* file2){
+    struct file_data *f1 = (struct file_data*)file1;
+    struct file_data *f2 = (struct file_data*)file2;
+
+    return strcmp(f1->name, f2->name);
+}
+
+
+void print_directory_files(const char* dir_path)
 {
     DIR* dir;
     struct dirent* ent;
     struct stat file_info;
+    struct file_data* dir_files = NULL;
     char* full_path;
+    int files_count = 0;
     int status;
+    char* link_path;
 
     dir = opendir(dir_path);
     if (dir == NULL) {
         perror("");
         return;
     }
+
     while ((ent = readdir(dir)) != NULL){
         if (is_file_hidden(ent->d_name)){
             continue;
         }
-
         full_path = calloc(strlen(dir_path) + strlen(ent->d_name) + 2, sizeof(char));
         sprintf(full_path, "%s/%s", dir_path, ent->d_name);
         status = lstat(full_path, &file_info);
         if (status != 0){
             perror("");
-            free(full_path);
             continue;
         }
-        print_file_info(&file_info, ent->d_name, full_path);
-        free(full_path);
+
+        files_count++;
+        dir_files = realloc(dir_files, sizeof(*dir_files) * files_count);
+        dir_files[files_count - 1].name = full_path;
+        dir_files[files_count - 1].info = file_info;
     }
+
+    qsort(dir_files, files_count, sizeof(*dir_files), sort_files);
+
+    for (int i = 0; i < files_count; ++i) {
+        print_file_info(&dir_files[i].info, get_file_name(dir_files[i].name));
+        if (S_ISLNK(dir_files[i].info.st_mode)){
+            link_path = get_symlink_path(dir_files[i].name);
+            if (link_path != NULL){
+                printf(" -> %s\n", link_path);
+                free(link_path);
+            }
+        } else {
+            printf("\n");
+        }
+        if (dir_files[i].name != NULL){
+            free(dir_files[i].name);
+        }
+    }
+
+    free(dir_files);
     closedir(dir);
 }
 
 
-void parse_arguments(int argc, char** argv, char*** parsed_args, int* args_count)
+void parse_arguments(int argc, char** argv, struct file_data** parsed_args, int* files_count)
 {
-    char** args_buffer;
-    char* buffer;
+    struct file_data* args_buffer;
+    int status;
+    int args_count = 0;
 
-    *args_count = argc == 1 ? 1 : argc - 1;
-    args_buffer = calloc(*args_count, sizeof(char*));
+    *files_count = argc == 1 ? 1 : argc - 1;
+    args_buffer = calloc(*files_count, sizeof(struct file_data));
     if (args_buffer == NULL){
-        *args_count = 0;
+        *files_count = 0;
         *parsed_args = NULL;
         return;
     }
 
     if (argc == 1){
-        buffer = calloc(100, sizeof(char));
-        args_buffer[0] = getcwd(buffer, 100);
+        status = lstat(".", &args_buffer[0].info);
+        if (status != 0) {
+            perror("");
+            args_count = 0;
+            free(args_buffer);
+            args_buffer = NULL;
+            return;
+        }
+        args_buffer[0].name = (char*)CURRENT_DIRECTORY;
+        args_count++;
     } else {
-        for (int i = 0; i < *args_count; ++i) {
-            args_buffer[i] = argv[i + 1];
+        for (int i = 0; i < *files_count; ++i) {
+            status = lstat(argv[i + 1], &args_buffer[args_count].info);
+            if (status != 0){
+                perror("");
+                continue;
+            }
+            args_buffer[i].name = argv[i + 1];
+            args_count++;
         }
     }
 
-    *parsed_args = args_buffer;
-}
+    qsort(args_buffer, args_count, sizeof(*args_buffer), sort_files);
 
-int compare_strings(const void* s1, const void* s2)
-{
-    return strcmp(s1, s2);
+    *parsed_args = args_buffer;
+    *files_count = args_count;
 }
 
 
 int main(int argc, char** argv) {
-    char** files;
-    struct stat file_info;
-    int status;
+    struct file_data* files;
     int args_count;
 
     parse_arguments(argc, argv, &files, &args_count);
@@ -246,26 +319,26 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    qsort(files, args_count, sizeof(char*), compare_strings);
-
-    for (int i = 0; i < args_count; ++i) {
-        status = lstat(files[i], &file_info);
-        if (status != 0){
-            perror("");
-            continue;
+    if (args_count == 1){
+        print_directory_files(files[0].name);
+    } else {
+        for (int i = 0; i < args_count; ++i) {
+            if (S_ISDIR(files[i].info.st_mode)){
+                continue;
+            }
+            print_file_info(&files[i].info, files[i].name);
+            printf("\n");
         }
 
-        if ((S_ISDIR(file_info.st_mode)) != 0){
-            print_directory_info(files[i]);
-        }
-        else {
-            print_file_info(&file_info, files[i], NULL);
+        for (int j = 0; j < args_count; ++j) {
+            if (!S_ISDIR(files[j].info.st_mode)){
+                continue;
+            }
+            printf("\n%s:\n", files[j].name);
+            print_directory_files(files[j].name);
         }
     }
 
-    if (argc == 1) {
-        free(files[0]);
-    }
     free(files);
 
     return 0;
