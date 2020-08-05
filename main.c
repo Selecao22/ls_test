@@ -134,10 +134,14 @@ void print_file_info(const struct stat* file_info, const char* file_name, const 
     user = get_user_by_uid(file_info->st_uid);
     group = get_group_by_gid(file_info->st_gid);
     get_mod_time_string(file_info->st_mtim, mod_time, MOD_TIME_STRING_SIZE);
-    if (S_ISLNK(file_info->st_mode) && path != NULL){
-        if(readlink(path, link_path, 100) != -1){
+    if (S_ISLNK(file_info->st_mode)){
+        if(readlink(path == NULL ? file_name : path, link_path, 100) != -1){
             sprintf(file_path, "%s -> %s", file_name, link_path);
+        } else{
+            perror("");
         }
+    } else {
+        sprintf(file_path, "%s", file_name);
     }
     printf("%s %lu %s %s %ld %s %s \n",
            mode,
@@ -146,7 +150,7 @@ void print_file_info(const struct stat* file_info, const char* file_name, const 
            group,
            file_info->st_size,
            mod_time,
-           S_ISLNK(file_info->st_mode) ? file_path : file_name);
+           file_path);
 
     free(mode);
     free(mod_time);
@@ -180,17 +184,20 @@ void print_directory_info(const char* dir_path)
         return;
     }
     while ((ent = readdir(dir)) != NULL){
-        full_path = calloc(strlen(dir_path) + strlen(ent->d_name) + 1, sizeof(char));
+        if (is_file_hidden(ent->d_name)){
+            continue;
+        }
+
+        full_path = calloc(strlen(dir_path) + strlen(ent->d_name) + 2, sizeof(char));
         sprintf(full_path, "%s/%s", dir_path, ent->d_name);
         status = lstat(full_path, &file_info);
         if (status != 0){
             perror("");
-            continue;
-        }
-        if (is_file_hidden(ent->d_name)){
+            free(full_path);
             continue;
         }
         print_file_info(&file_info, ent->d_name, full_path);
+        free(full_path);
     }
     closedir(dir);
 }
@@ -203,6 +210,12 @@ void parse_arguments(int argc, char** argv, char*** parsed_args, int* args_count
 
     *args_count = argc == 1 ? 1 : argc - 1;
     args_buffer = calloc(*args_count, sizeof(char*));
+    if (args_buffer == NULL){
+        *args_count = 0;
+        *parsed_args = NULL;
+        return;
+    }
+
     if (argc == 1){
         buffer = calloc(100, sizeof(char));
         args_buffer[0] = getcwd(buffer, 100);
@@ -215,6 +228,11 @@ void parse_arguments(int argc, char** argv, char*** parsed_args, int* args_count
     *parsed_args = args_buffer;
 }
 
+int compare_strings(const void* s1, const void* s2)
+{
+    return strcmp(s1, s2);
+}
+
 
 int main(int argc, char** argv) {
     char** files;
@@ -223,6 +241,12 @@ int main(int argc, char** argv) {
     int args_count;
 
     parse_arguments(argc, argv, &files, &args_count);
+
+    if (args_count == 0){
+        return 1;
+    }
+
+    qsort(files, args_count, sizeof(char*), compare_strings);
 
     for (int i = 0; i < args_count; ++i) {
         status = lstat(files[i], &file_info);
