@@ -72,9 +72,6 @@ void get_directory_files(const char* dir_path, struct file_data** files, int* fi
     char *full_path;
     int files_count = 0;
     int status;
-    char *link_path;
-    char *real_name;
-    struct align_parameters align;
 
     dir = opendir(dir_path);
     if (dir == NULL) {
@@ -109,13 +106,8 @@ void get_directory_files(const char* dir_path, struct file_data** files, int* fi
 
 
 void print_directory_files(const char* dir_path){
-    DIR* dir;
-    struct dirent* ent;
-    struct stat file_info;
     struct file_data* dir_files = NULL;
-    char* full_path;
     int files_count = 0;
-    int status;
     char* link_path;
     char* real_name;
     struct align_parameters align;
