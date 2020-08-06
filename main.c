@@ -105,7 +105,6 @@ void print_directory_files(const char* dir_path)
     align = get_align_parameters(dir_files, files_count);
     printf("total %ld\n", get_total(dir_files, files_count));
     for (int i = 0; i < files_count; ++i) {
-        //TODO
         real_name = dir_files[i].name;
         dir_files[i].name = get_file_name(dir_files[i].name);
         print_file_info(dir_files[i], align);
@@ -178,7 +177,7 @@ void parse_arguments(int argc, char** argv, struct file_data** parsed_args, int*
 int main(int argc, char** argv) {
     struct file_data* files;
     int args_count;
-    struct align_parameters align;
+    struct align_parameters align = {0,0,0,0,0};
 
     setlocale(LC_ALL, "");
     setlocale(LC_COLLATE, "");
@@ -189,8 +188,17 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (args_count == 1){
+    if (argc == 1){
         print_directory_files(files[0].name);
+        free_file_info(&files[0]);
+    } else if (args_count == 1) {
+        if (S_ISDIR(files[0].info.st_mode)){
+            print_directory_files(files[0].name);
+        } else {
+            print_file_info(files[0], align);
+            printf("\n");
+            free_file_info(&files[0]);
+        }
     } else {
         align = get_align_parameters(files, args_count);
         for (int i = 0; i < args_count; ++i) {
