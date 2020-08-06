@@ -24,6 +24,15 @@ long get_total(struct file_data* files, int file_count) {
     return total / 2;
 }
 
+
+void print_error_message(const char* filename){
+    char message[200] = {0};
+
+    sprintf(message, "ls: cannot access \'%s\'", filename);
+    perror(message);
+}
+
+
 struct align_parameters get_align_parameters(struct file_data* files, int files_count)
 {
     int hard_links_align = 0;
@@ -75,7 +84,7 @@ void get_directory_files(const char* dir_path, struct file_data** files, int* fi
 
     dir = opendir(dir_path);
     if (dir == NULL) {
-        perror("");
+        print_error_message(dir_path);
         return;
     }
 
@@ -89,7 +98,7 @@ void get_directory_files(const char* dir_path, struct file_data** files, int* fi
         sprintf(full_path, "%s/%s", dir_path, ent->d_name);
         status = lstat(full_path, &file_info);
         if (status != 0) {
-            perror("");
+            print_error_message(ent->d_name);
             continue;
         }
 
@@ -161,7 +170,7 @@ void parse_arguments(int argc, char** argv, struct file_data** parsed_args, int*
         // if no args present then get info about current dir
         status = lstat(CURRENT_DIRECTORY, &file_stat);
         if (status != 0) {
-            perror("");
+            print_error_message(CURRENT_DIRECTORY);
             free(args_buffer);
             *parsed_args = NULL;
             *files_count = 0;
@@ -173,7 +182,7 @@ void parse_arguments(int argc, char** argv, struct file_data** parsed_args, int*
         for (int i = 0; i < *files_count; ++i) {
             status = lstat(argv[i + 1], &file_stat);
             if (status != 0){
-                perror("");
+                print_error_message(argv[i + 1]);
                 continue;
             }
             args_buffer[i] = get_file_info(file_stat, argv[i + 1]);
