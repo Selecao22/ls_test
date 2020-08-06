@@ -181,6 +181,7 @@ int main(int argc, char** argv) {
     struct align_parameters align;
 
     setlocale(LC_ALL, "");
+    setlocale(LC_COLLATE, "");
 
     parse_arguments(argc, argv, &files, &args_count);
 
