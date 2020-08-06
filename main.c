@@ -64,8 +64,51 @@ struct align_parameters get_align_parameters(struct file_data* files, int files_
 }
 
 
-void print_directory_files(const char* dir_path)
-{
+void get_directory_files(const char* dir_path, struct file_data** files, int* file_count) {
+    DIR *dir;
+    struct dirent *ent;
+    struct stat file_info;
+    struct file_data *dir_files = NULL;
+    char *full_path;
+    int files_count = 0;
+    int status;
+    char *link_path;
+    char *real_name;
+    struct align_parameters align;
+
+    dir = opendir(dir_path);
+    if (dir == NULL) {
+        perror("");
+        return;
+    }
+
+    // enumerate files in dir
+    while ((ent = readdir(dir)) != NULL) {
+        if (is_file_hidden(ent->d_name)) {
+            continue;
+        }
+        //get full file path to get info about file
+        full_path = calloc(strlen(dir_path) + strlen(ent->d_name) + 2, sizeof(char));
+        sprintf(full_path, "%s/%s", dir_path, ent->d_name);
+        status = lstat(full_path, &file_info);
+        if (status != 0) {
+            perror("");
+            continue;
+        }
+
+        files_count++;
+        dir_files = realloc(dir_files, sizeof(*dir_files) * files_count);
+        dir_files[files_count - 1] = get_file_info(file_info, full_path);
+    }
+    closedir(dir);
+    qsort(dir_files, files_count, sizeof(*dir_files), sort_files);
+
+    *files = dir_files;
+    *file_count = files_count;
+}
+
+
+void print_directory_files(const char* dir_path){
     DIR* dir;
     struct dirent* ent;
     struct stat file_info;
@@ -77,37 +120,15 @@ void print_directory_files(const char* dir_path)
     char* real_name;
     struct align_parameters align;
 
-    dir = opendir(dir_path);
-    if (dir == NULL) {
-        perror("");
-        return;
-    }
+    get_directory_files(dir_path, &dir_files, &files_count);
 
-    while ((ent = readdir(dir)) != NULL){
-        if (is_file_hidden(ent->d_name)){
-            continue;
-        }
-        full_path = calloc(strlen(dir_path) + strlen(ent->d_name) + 2, sizeof(char));
-        sprintf(full_path, "%s/%s", dir_path, ent->d_name);
-        status = lstat(full_path, &file_info);
-        if (status != 0){
-            perror("");
-            continue;
-        }
-
-        files_count++;
-        dir_files = realloc(dir_files, sizeof(*dir_files) * files_count);
-        dir_files[files_count - 1] = get_file_info(file_info, full_path);
-    }
-    closedir(dir);
-
-    qsort(dir_files, files_count, sizeof(*dir_files), sort_files);
     align = get_align_parameters(dir_files, files_count);
     printf("total %ld\n", get_total(dir_files, files_count));
     for (int i = 0; i < files_count; ++i) {
         real_name = dir_files[i].name;
         dir_files[i].name = get_file_name(dir_files[i].name);
         print_file_info(dir_files[i], align);
+        //if file is link print path to linked file
         if (S_ISLNK(dir_files[i].info.st_mode)){
             link_path = get_symlink_path(real_name);
             if (link_path != NULL){
@@ -145,6 +166,7 @@ void parse_arguments(int argc, char** argv, struct file_data** parsed_args, int*
     }
 
     if (argc == 1){
+        // if no args present then get info about current dir
         status = lstat(CURRENT_DIRECTORY, &file_stat);
         if (status != 0) {
             perror("");
@@ -179,7 +201,9 @@ int main(int argc, char** argv) {
     int args_count;
     struct align_parameters align = {0,0,0,0,0};
 
+    // set system locale
     setlocale(LC_ALL, "");
+    //set locate for sorting funcs
     setlocale(LC_COLLATE, "");
 
     parse_arguments(argc, argv, &files, &args_count);
