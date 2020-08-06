@@ -51,4 +51,7 @@ struct file_data get_file_info(struct stat file_stat, const char* file_name);
 
 void print_file_info(struct file_data file, struct align_parameters align);
 
+
+void free_file_info(struct file_data* file);
+
 #endif //MY_LS_FILE_INFO_H

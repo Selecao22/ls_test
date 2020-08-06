@@ -206,3 +206,16 @@ void print_file_info(struct file_data file, struct align_parameters align)
            file.mod_time_str,
            file.name);
 }
+
+void free_file_info(struct file_data* file)
+{
+    if (file->mod_time_str != NULL){
+        free(file->mod_time_str);
+        file->mod_time_str = NULL;
+    }
+
+    if (file->mode_string != NULL){
+        free(file->mode_string);
+        file->mode_string = NULL;
+    }
+}

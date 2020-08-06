@@ -122,6 +122,7 @@ void print_directory_files(const char* dir_path)
         if (real_name != NULL){
             free(real_name);
             dir_files[i].name = NULL;
+            free_file_info(&dir_files[i]);
         }
     }
 
@@ -201,10 +202,12 @@ int main(int argc, char** argv) {
 
         for (int j = 0; j < args_count; ++j) {
             if (!S_ISDIR(files[j].info.st_mode)){
+                free_file_info(&files[j]);
                 continue;
             }
             printf("\n%s:\n", files[j].name);
             print_directory_files(files[j].name);
+            free_file_info(&files[j]);
         }
     }
 
