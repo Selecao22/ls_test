@@ -100,12 +100,12 @@ void get_mod_time_string(struct timespec ts, char* buf, int buf_count)
     }
 
     clock_gettime(CLOCK_REALTIME, &real_time);
-    strftime(current_year, 5, "%Y", gmtime(&real_time.tv_sec));
-    strftime(buf, buf_count, "%Y", gmtime(&ts.tv_sec));
+    strftime(current_year, 5, "%Y", localtime(&real_time.tv_sec));
+    strftime(buf, buf_count, "%Y", localtime(&ts.tv_sec));
     if (!strcmp(current_year, buf)) {
-        strftime(buf, buf_count, "%b %2e %H:%M", gmtime(&ts.tv_sec));
+        strftime(buf, buf_count, "%b %2e %H:%M", localtime(&ts.tv_sec));
     } else {
-        strftime(buf, buf_count, "%b %2e %5Y", gmtime(&ts.tv_sec));
+        strftime(buf, buf_count, "%b %2e %-5Y", localtime(&ts.tv_sec));
     }
 }
 
